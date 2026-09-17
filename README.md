@@ -1,4 +1,3 @@
-# scutts318.github.io
 # VSR Tool — Ventilator Settings Record
 **Sleep & Ventilation Department · Royal Brompton Hospital / GSTT**
 
