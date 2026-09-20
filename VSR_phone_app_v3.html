@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#005EB8">
+<title>VSR Tool — Sleep &amp; Ventilation</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --nhs:#005EB8;--nhs-d:#004a94;--nhs-s:#e8f0fb;--nhs-m:#b8d0f4;
+  --green:#0e7a4e;--green-s:#e8f5ee;--green-m:#86efac;
+  --amber:#92400e;--amber-s:#fffbeb;--amber-m:#fcd34d;
+  --red:#991b1b;--red-s:#fef2f2;--red-m:#fca5a5;
+  --purple:#4c1d95;--purple-s:#f5f3ff;--purple-m:#c4b5fd;
+  --ink:#0c1220;--ink2:#374151;--ink3:#6b7280;--ink4:#9ca3af;
+  --page:#f4f5f8;--white:#fff;--rule:#e5e7eb;--rule-l:#f0f1f4;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --r:10px;--r-lg:16px;
+  --sh:0 1px 4px rgba(0,0,0,.08),0 2px 12px rgba(0,0,0,.04);
+  --sh-lg:0 4px 24px rgba(0,0,0,.12);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sat:env(safe-area-inset-top,0px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:15px;display:flex;flex-direction:column;}
+
+/* topbar */
+.topbar{background:var(--nhs);padding:12px 16px;padding-top:max(12px,var(--sat));flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.tb-left{display:flex;align-items:center;gap:10px;}
+.tb-icon{width:34px;height:34px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tb-icon svg{width:20px;height:20px;}
+.tb-title{color:white;font-size:15px;font-weight:600;line-height:1.2;}
+.tb-sub{color:rgba(255,255,255,.7);font-size:11px;font-family:var(--mono);}
+.tb-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:white;font-size:12px;font-family:var(--sans);font-weight:500;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;}
+
+/* screens */
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
+.screen.on{display:flex;}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(80px + var(--sab));}
+
+/* cards */
+.card{background:var(--white);border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--sh);margin-bottom:12px;overflow:hidden;}
+.ch{padding:11px 14px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ch-title{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;}
+.sdot{width:22px;height:22px;background:var(--nhs);border-radius:50%;color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono);flex-shrink:0;}
+.cb{padding:13px 14px;}
+
+/* mode buttons */
+.mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.mode-btn{padding:14px 8px;border:2px solid var(--rule);border-radius:var(--r);background:var(--white);font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer;text-align:center;line-height:1.4;transition:all .15s;}
+.mode-btn .mi{font-size:24px;display:block;margin-bottom:5px;}
+.mode-btn.on.change{border-color:var(--amber);background:var(--amber-s);color:var(--amber);}
+.mode-btn.on.same{border-color:var(--nhs);background:var(--nhs-s);color:var(--nhs);}
+
+/* device blocks */
+.device-block{border:2px solid var(--rule);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden;}
+.device-header{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.device-header.old{background:var(--amber-s);border-bottom:2px solid var(--amber-m);}
+.device-header.new{background:var(--green-s);border-bottom:2px solid var(--green-m);}
+.device-header.single{background:var(--nhs-s);border-bottom:2px solid var(--nhs-m);}
+.device-label{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;}
+.device-label.old{color:var(--amber);}
+.device-label.new{color:var(--green);}
+.device-label.single{color:var(--nhs);}
+.device-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+
+/* photo slots */
+.photo-slot{border:2px dashed var(--rule);border-radius:var(--r);padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;position:relative;background:var(--rule-l);transition:all .15s;}
+.photo-slot.has-photo{border-style:solid;border-color:var(--nhs-m);background:var(--nhs-s);}
+.photo-slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.slot-ic{width:40px;height:40px;border-radius:8px;background:var(--rule);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;}
+.photo-slot.has-photo .slot-ic{background:var(--nhs-m);}
+.slot-ic svg{width:20px;height:20px;color:var(--ink3);}
+.photo-slot.has-photo .slot-ic svg{color:var(--nhs);}
+.slot-info{flex:1;min-width:0;}
+.slot-lbl{font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:1px;}
+.photo-slot.has-photo .slot-lbl{color:var(--nhs);}
+.slot-sub{font-size:11px;color:var(--ink4);font-family:var(--mono);}
+.photo-slot.has-photo .slot-sub{color:var(--nhs);opacity:.8;}
+.slot-thumb{width:40px;height:40px;border-radius:7px;object-fit:cover;border:1px solid var(--nhs-m);flex-shrink:0;display:none;}
+.photo-slot.has-photo .slot-thumb{display:block;}
+.slot-btns{display:flex;gap:6px;margin-top:6px;}
+.slot-btn{flex:1;padding:6px 4px;border:1px solid var(--nhs-m);border-radius:6px;background:var(--nhs-s);color:var(--nhs);font-size:11px;font-weight:600;font-family:var(--sans);cursor:pointer;text-align:center;position:relative;overflow:hidden;}
+.slot-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.photo-slot.has-photo .slot-btns{display:none;}
+.slot-rm{position:absolute;top:6px;right:6px;width:20px;height:20px;background:var(--red);border:none;border-radius:50%;color:white;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:2;line-height:1;}
+.photo-slot.has-photo .slot-rm{display:flex;}
+
+/* profile blocks */
+.profile-block{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;margin-bottom:8px;}
+.profile-header{padding:8px 12px;background:var(--rule-l);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;}
+.profile-name{font-size:12px;font-weight:700;color:var(--ink2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;}
+.profile-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+.profile-screens{display:flex;flex-direction:column;gap:7px;}
+
+/* add buttons */
+.add-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:2px dashed var(--nhs-m);border-radius:var(--r);background:var(--nhs-s);color:var(--nhs);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;width:100%;}
+.add-btn:active{background:var(--nhs-m);}
+
+/* fg inputs */
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:10px;font-weight:700;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;}
+.fg input,.fg select,.fg textarea{padding:9px 11px;border:1.5px solid var(--rule);border-radius:var(--r);font-family:var(--sans);font-size:13px;color:var(--ink);background:var(--white);width:100%;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--nhs);}
+.fg textarea{min-height:70px;resize:vertical;}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+/* progress */
+.pbar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden;display:none;margin-bottom:7px;}
+.pbar.on{display:block;}
+.pfill{height:100%;background:var(--nhs);border-radius:2px;width:0%;transition:width .4s;}
+.status{font-size:12px;font-family:var(--mono);color:var(--ink3);min-height:18px;}
+.status.ok{color:var(--green);}.status.err{color:var(--red);}
+
+/* results */
+.rs-section{margin-bottom:12px;}
+.rs-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:white;padding:7px 12px;border-radius:7px 7px 0 0;font-family:var(--mono);}
+.rs-hdr.blue{background:var(--nhs);}
+.rs-hdr.amber{background:var(--amber);}
+.rs-hdr.green{background:var(--green);}
+.rs-hdr.grey{background:var(--ink2);}
+.rs-hdr.purple{background:var(--purple);}
+.rs-rows{border:1px solid var(--rule);border-top:none;border-radius:0 0 7px 7px;overflow:hidden;}
+.rs-row{display:flex;border-bottom:1px solid var(--rule-l);}
+.rs-row:last-child{border-bottom:none;}
+.rs-lbl{flex:0 0 46%;padding:8px 10px;font-size:11px;font-weight:600;color:var(--ink3);border-right:1px solid var(--rule-l);background:var(--rule-l);line-height:1.4;}
+.rs-val{flex:1;padding:0;}
+.rs-val input{width:100%;border:none;background:transparent;font-family:var(--mono);font-size:13px;color:var(--ink);padding:8px 10px;outline:none;}
+
+/* conf */
+.conf{display:flex;align-items:center;gap:7px;padding:7px 11px;background:var(--nhs-s);border:1px solid var(--nhs-m);border-radius:var(--r);margin-bottom:10px;}
+.conf-lbl{font-size:10px;font-weight:600;color:var(--nhs);font-family:var(--mono);white-space:nowrap;}
+.conf-track{flex:1;height:5px;background:var(--nhs-m);border-radius:3px;overflow:hidden;}
+.conf-fill{height:100%;background:var(--nhs);border-radius:3px;transition:width .5s;}
+.conf-pct{font-size:11px;font-weight:600;color:var(--nhs);font-family:var(--mono);}
+
+/* action bar */
+.action-bar{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--rule);padding:10px 14px;padding-bottom:max(10px,var(--sab));display:flex;gap:9px;box-shadow:0 -4px 16px rgba(0,0,0,.06);z-index:50;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:var(--r);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .12s;flex:1;}
+.btn-nhs{background:var(--nhs);color:white;}.btn-nhs:active{background:var(--nhs-d);}
+.btn-nhs:disabled{background:var(--rule);color:var(--ink4);cursor:not-allowed;}
+.btn-green{background:var(--green);color:white;}.btn-green:active{filter:brightness(.9);}
+.btn-out{background:var(--white);color:var(--ink2);border:1.5px solid var(--rule);}.btn-out:active{background:var(--rule-l);}
+.btn-sm{padding:8px 12px;font-size:12px;flex:none;width:auto;}
+
+/* setup */
+.setup-wrap{overflow-y:auto;padding:20px 16px 40px;}
+.setup-inner{max-width:420px;margin:0 auto;}
+.setup-logo{width:54px;height:54px;background:var(--nhs);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+.setup-logo svg{width:28px;height:28px;}
+.setup-title{font-size:19px;font-weight:600;text-align:center;margin-bottom:5px;}
+.setup-sub{font-size:13px;color:var(--ink3);text-align:center;margin-bottom:20px;line-height:1.5;}
+.hint{font-size:11px;color:var(--ink4);line-height:1.5;margin-top:3px;}
+.setup-err{margin-top:8px;font-size:12px;color:var(--red);text-align:center;display:none;}
+
+/* badge */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;font-family:var(--mono);}
+.badge-ai{background:var(--nhs-s);color:var(--nhs);border:1px solid var(--nhs-m);}
+
+/* toasts */
+.toasts{position:fixed;bottom:80px;left:14px;right:14px;z-index:200;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
+.toast{background:var(--ink);color:white;padding:11px 14px;border-radius:var(--r);font-size:13px;font-weight:500;box-shadow:var(--sh-lg);animation:tin .2s ease;width:100%;max-width:420px;margin:0 auto;}
+.toast.ok{background:var(--green);}.toast.err{background:var(--red);}
+@keyframes tin{from{transform:translateY(8px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes tout{from{opacity:1;}to{opacity:0;}}
+.toast.hiding{animation:tout .18s ease forwards;}
+
+/* icons */
+.ic-screen{--i:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='2' y='4' width='20' height='14' rx='2'/%3E%3Cpath d='M2 9h20M9 18l-2 2M15 18l2 2M8 20h8'/%3E%3C/svg%3E");}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div id="scrSetup" class="screen on">
+  <div class="setup-wrap">
+    <div class="setup-inner">
+      <div class="setup-logo">
+        <svg viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="3" stroke="white" stroke-width="2"/><path d="M2 12h24M8 6V3M20 6V3" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div class="setup-title">VSR Tool</div>
+      <div class="setup-sub">Ventilator Settings Record<br>Sleep &amp; Ventilation · Royal Brompton</div>
+
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Team passphrase</label>
+        <input type="password" id="sPass" placeholder="Shared team passphrase" autocomplete="off">
+        <div class="hint">Provided by your administrator</div>
+      </div>
+
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Cloudflare Worker URL</label>
+        <input type="url" id="sWorker" placeholder="https://vsr-proxy.yourname.workers.dev">
+        <div class="hint">Provided by your administrator</div>
+      </div>
+      <div style="border-top:1px solid var(--rule);margin:14px 0;"></div>
+      <div class="fg-row" style="margin-bottom:12px;">
+        <div class="fg"><label>Your name</label><input type="text" id="sName" placeholder="Full name"></div>
+        <div class="fg"><label>Role</label><input type="text" id="sRole" placeholder="e.g. Physio"></div>
+      </div>
+      <div class="fg" style="margin-bottom:16px;">
+        <label>Hospital</label>
+        <input type="text" id="sHosp" placeholder="e.g. Royal Brompton Hospital / GSTT">
+      </div>
+
+      <button class="btn btn-nhs" onclick="saveSetup()" style="flex:none;width:100%;">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save &amp; continue
+      </button>
+      <div class="setup-err" id="sErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN SCREEN ══ -->
+<div id="scrMain" class="screen">
+  <div class="topbar">
+    <div class="tb-left">
+      <div class="tb-icon">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="16" rx="2.5" stroke="white" stroke-width="1.8"/><path d="M2 10h20M7 5V2M17 5V2" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <div class="tb-title">VSR Tool</div>
+        <div class="tb-sub">Sleep &amp; Ventilation · RBH</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;">
+      <button class="tb-btn" onclick="resetForm()">↺ New</button>
+      <button class="tb-btn" onclick="goSetup()">⚙</button>
+    </div>
+  </div>
+
+  <div class="content" id="mainContent">
+
+    <!-- Step 1: Mode -->
+    <div class="card">
+      <div class="ch"><div class="ch-title"><div class="sdot">1</div>Type of visit</div></div>
+      <div class="cb">
+        <div class="mode-row">
+          <button class="mode-btn change" id="modeChange" onclick="setMode('change')">
+            <span class="mi">⇄</span>Change of device
+          </button>
+          <button class="mode-btn same" id="modeSame" onclick="setMode('same')">
+            <span class="mi">⚙</span>Same device
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Devices + profiles + photos -->
+    <div id="devicesWrap" style="display:none;">
+      <div class="card">
+        <div class="ch">
+          <div class="ch-title"><div class="sdot">2</div>Photograph devices</div>
+          <span class="badge badge-ai">✦ AI reads all</span>
+        </div>
+        <div class="cb" id="devicesBody">
+          <!-- injected -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="progressCard" style="display:none;">
+      <div class="cb">
+        <div class="pbar on" id="pbar"><div class="pfill" id="pfill"></div></div>
+        <div class="status" id="status">Analysing photos…</div>
+      </div>
+    </div>
+
+    <!-- Step 3: Results -->
+    <div class="card" id="resultsCard" style="display:none;">
+      <div class="ch">
+        <div class="ch-title"><div class="sdot">3</div>Review &amp; edit</div>
+        <div class="conf" id="confBar" style="margin:0;padding:4px 8px;">
+          <span class="conf-lbl">AI</span>
+          <div class="conf-track" style="width:50px;"><div class="conf-fill" id="confFill" style="width:0%"></div></div>
+          <span class="conf-pct" id="confPct">—</span>
+        </div>
+      </div>
+      <div class="cb" id="resultsBody"></div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card" id="notesCard" style="display:none;">
+      <div class="ch"><div class="ch-title"><div class="sdot">4</div>Additional notes</div></div>
+      <div class="cb">
+        <div class="fg">
+          <textarea id="notesField" placeholder="Any additional instructions for Baywater…"></textarea>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Bottom bar -->
+  <div class="action-bar">
+    <button class="btn btn-nhs" id="extractBtn" onclick="extractAll()" disabled>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Extract with AI
+    </button>
+    <button class="btn btn-green" id="downloadBtn" onclick="downloadRecord()" style="display:none;">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Download &amp; email
+    </button>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+// == STATE ==
+let mode = null;
+let cfg = {};
+// devices[i] = { type:'old'|'new'|'single', name:'', serial:'', asset:'', barcode:'', svcDate:'',
+//                profiles:[{ name:'', screens:[{data,mime,label},...], alarmPhoto:{data,mime} }] }
+let devices = [];
+let extracted = null;
+let photoCounter = 0; // unique IDs
+
+const MAX_PROFILES = 4;
+const MAX_SCREENS = 4;
+
+// == SETUP ==
+function loadCfg(){
+  try{ cfg=JSON.parse(localStorage.getItem('vsrCfg2')||'{}'); }catch{ cfg={}; }
+  if(cfg.pass&&cfg.worker){ showScr('scrMain'); applySetupFields(); }
+}
+function applySetupFields(){
+  sv('sPass',cfg.pass||''); sv('sWorker',cfg.worker||'');
+  sv('sName',cfg.name||''); sv('sRole',cfg.role||''); sv('sHosp',cfg.hosp||'');
+}
+function saveSetup(){
+  const pass=gv('sPass'),key='',worker=gv('sWorker'),name=gv('sName'),role=gv('sRole'),hosp=gv('sHosp');
+  const err=document.getElementById('sErr');
+  if(!pass){showSErr('Enter the team passphrase');return;}
+
+  if(!worker.startsWith('https://')){showSErr('Worker URL should start with https://');return;}
+  cfg={pass,key,worker,name:name||'Steve Cutts',role:role||'Respiratory Physiotherapist',hosp:hosp||'Royal Brompton Hospital / GSTT'};
+  localStorage.setItem('vsrCfg2',JSON.stringify(cfg));
+  err.style.display='none';
+  showScr('scrMain');
+  toast('Setup saved','ok');
+}
+function showSErr(m){const e=document.getElementById('sErr');e.textContent=m;e.style.display='block';}
+function goSetup(){applySetupFields();showScr('scrSetup');}
+function showScr(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));document.getElementById(id).classList.add('on');}
+
+// == MODE ==
+function setMode(m){
+  mode=m;
+  devices=[];
+  extracted=null;
+  document.getElementById('modeChange').classList.toggle('on',m==='change');
+  document.getElementById('modeChange').classList.toggle('change',true);
+  document.getElementById('modeSame').classList.toggle('on',m==='same');
+  document.getElementById('modeSame').classList.toggle('same',true);
+
+  if(m==='change'){
+    devices=[makeDevice('old'),makeDevice('new')];
+  } else {
+    devices=[makeDevice('single')];
+  }
+
+  document.getElementById('devicesWrap').style.display='block';
+  document.getElementById('resultsCard').style.display='none';
+  document.getElementById('notesCard').style.display='none';
+  document.getElementById('downloadBtn').style.display='none';
+  document.getElementById('extractBtn').style.display='inline-flex';
+  document.getElementById('progressCard').style.display='none';
+  renderDevices();
+  updExtractBtn();
+}
+
+function makeDevice(type){
+  return { type, name:'', serial:'', asset:'', barcode:'', svcDate:'', profiles:[makeProfile(1)] };
+}
+
+function makeProfile(num){
+  return { num, screens:[], alarmPhoto:null };
+}
+
+// == RENDER ==
+function renderDevices(){
+  const body=document.getElementById('devicesBody');
+  body.innerHTML='';
+  devices.forEach((dev,di)=>{ body.appendChild(renderDevice(dev,di)); });
+}
+
+function renderDevice(dev,di){
+  const wrap=document.createElement('div');
+  wrap.className='device-block';
+  wrap.id='dev_'+di;
+
+  const typeLabel = dev.type==='old'?'🔴 Old Ventilator':dev.type==='new'?'🟢 New Ventilator':'🔵 Device';
+  const typeClass = dev.type==='old'?'old':dev.type==='new'?'new':'single';
+
+  wrap.innerHTML=`
+    <div class="device-header ${typeClass}">
+      <div class="device-label ${typeClass}">${typeLabel}</div>
+    </div>
+    <div class="device-body" id="devbody_${di}">
+
+      <!-- Label / barcode photo -->
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">Device identification photos</div>
+      ${makeSlotHTML(di,-1,-4,'front','📱 Front of device','helps AI identify device model')}
+      ${makeSlotHTML(di,-1,-1,'label','📋 Serial number label','rear or underside of device')}
+      ${makeSlotHTML(di,-1,-2,'barcode','▦ Barcode / asset tag','optional — if present')}
+
+      <!-- Profiles -->
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Settings &amp; alarms</div>
+      <div id="profiles_${di}"></div>
+      ${dev.profiles.length<MAX_PROFILES?`<button class="add-btn" onclick="addProfile(${di})">＋ Add profile / prescription</button>`:''}
+    </div>
+  `;
+
+  // render profiles
+  const profWrap=wrap.querySelector(`#profiles_${di}`);
+  if(profWrap){
+    dev.profiles.forEach((prof,pi)=>{ profWrap.appendChild(renderProfile(di,pi,prof)); });
+  }
+
+  return wrap;
+}
+
+function renderProfile(di,pi,prof){
+  const wrap=document.createElement('div');
+  wrap.className='profile-block';
+  wrap.id=`prof_${di}_${pi}`;
+
+  const title = prof.num===1&&devices[di].profiles.length===1 ? 'Settings &amp; Alarms' : `Profile ${prof.num}`;
+  const canRemove = pi>0;
+
+  wrap.innerHTML=`
+    <div class="profile-header">
+      <div class="profile-name">${title}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${canRemove?`<button class="btn btn-out btn-sm" onclick="removeProfile(${di},${pi})" style="font-size:11px;padding:4px 8px;color:var(--red);border-color:var(--red-m);">Remove</button>`:''}
+      </div>
+    </div>
+    <div class="profile-body">
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;">Settings screens (photograph each page)</div>
+      <div class="profile-screens" id="screens_${di}_${pi}"></div>
+      ${prof.screens.length<MAX_SCREENS?`<button class="add-btn" onclick="addScreen(${di},${pi})">＋ Add settings screen</button>`:''}
+      <div style="font-size:10px;font-weight:700;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;">Alarms</div>
+      ${makeSlotHTML(di,pi,-3,'alarm','🔔 Alarms panel','all visible alarm settings')}
+    </div>
+  `;
+
+  // render existing screens
+  const screensWrap=wrap.querySelector(`#screens_${di}_${pi}`);
+  prof.screens.forEach((_,si)=>{ screensWrap.appendChild(makeScreenSlotEl(di,pi,si)); });
+
+  // If no screens yet, add one empty slot
+  if(!prof.screens.length){
+    prof.screens.push(null);
+    screensWrap.appendChild(makeScreenSlotEl(di,pi,0));
+  }
+
+  return wrap;
+}
+
+function makeScreenSlotEl(di,pi,si){
+  const photo=devices[di].profiles[pi].screens[si];
+  const uid=`sc_${di}_${pi}_${si}`;
+  const div=document.createElement('div');
+  div.id=uid;
+  div.className='photo-slot'+(photo?' has-photo':'');
+  div.innerHTML=`
+    <div class="slot-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 9h20"/><path d="M7 17l-2 3M17 17l2 3M9 20h6"/></svg></div>
+    <div class="slot-info">
+      <div class="slot-lbl">Settings screen ${si+1}</div>
+      <div class="slot-sub">${photo?'✓ Captured':'tap below to add photo'}</div>
+      <div class="slot-btns">
+        <div class="slot-btn">📷 Camera<input type="file" accept="image/*" capture="camera" onchange="screenPhotoAdded(event,${di},${pi},${si})"></div>
+        <div class="slot-btn">🖼 Library<input type="file" accept="image/*" multiple onchange="screenMultiAdded(event,${di},${pi},${si})"></div>
+      </div>
+    </div>
+    <img class="slot-thumb" ${photo?`src="data:${photo.mime};base64,${photo.data}"`:''}>
+    <button class="slot-rm" onclick="removeScreen(event,${di},${pi},${si})">✕</button>
+  `;
+  return div;
+}
+
+function makeSlotHTML(di,pi,specialIdx,type,label,sub){
+  // specialIdx: -1=label, -2=barcode, -3=alarm
+  const photo=getSpecialPhoto(di,pi,specialIdx);
+  const uid=`sp_${di}_${pi}_${specialIdx}`;
+  const onchange=`specialPhotoAdded(event,${di},${pi},${specialIdx})`;
+  const onrm=`removeSpecial(event,${di},${pi},${specialIdx})`;
+  return `<div class="photo-slot${photo?' has-photo':''}" id="${uid}">
+    <div class="slot-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><path d="M9 12h6M9 15h4"/></svg></div>
+    <div class="slot-info">
+      <div class="slot-lbl">${label}</div>
+      <div class="slot-sub">${photo?'✓ Captured':sub}</div>
+      <div class="slot-btns">
+        <div class="slot-btn">📷 Camera<input type="file" accept="image/*" capture="camera" onchange="${onchange}"></div>
+        <div class="slot-btn">🖼 Library<input type="file" accept="image/*" onchange="${onchange}"></div>
+      </div>
+    </div>
+    <img class="slot-thumb" ${photo?`src="data:${photo.mime};base64,${photo.data}"`:''}>
+    <button class="slot-rm" onclick="${onrm}">✕</button>
+  </div>`;
+}
+
+function getSpecialPhoto(di,pi,idx){
+  const dev=devices[di];
+  if(idx===-1) return dev._labelPhoto||null;
+  if(idx===-2) return dev._barcodePhoto||null;
+  if(idx===-3) return (dev.profiles[pi]||{})._alarmPhoto||null;
+  if(idx===-4) return dev._frontPhoto||null;
+  return null;
+}
+
+// == ADD / REMOVE ==
+function addProfile(di){
+  const dev=devices[di];
+  if(dev.profiles.length>=MAX_PROFILES) return;
+  dev.profiles.push(makeProfile(dev.profiles.length+1));
+  renderDevices();
+}
+function removeProfile(di,pi){
+  devices[di].profiles.splice(pi,1);
+  renderDevices();
+}
+function addScreen(di,pi){
+  const prof=devices[di].profiles[pi];
+  if(prof.screens.length>=MAX_SCREENS) return;
+  prof.screens.push(null);
+  renderDevices();
+}
+function removeScreen(e,di,pi,si){
+  e.preventDefault();e.stopPropagation();
+  devices[di].profiles[pi].screens.splice(si,1);
+  if(!devices[di].profiles[pi].screens.length) devices[di].profiles[pi].screens=[null];
+  renderDevices();
+  updExtractBtn();
+}
+function removeSpecial(e,di,pi,idx){
+  e.preventDefault();e.stopPropagation();
+  const dev=devices[di];
+  if(idx===-1) delete dev._labelPhoto;
+  if(idx===-2) delete dev._barcodePhoto;
+  if(idx===-3) delete dev.profiles[pi]._alarmPhoto;
+  if(idx===-4) delete dev._frontPhoto;
+  renderDevices();
+  updExtractBtn();
+}
+
+// == PHOTO HANDLERS ==
+function screenPhotoAdded(e,di,pi,si){
+  const f=e.target.files[0];if(!f)return;
+  readFile(f,photo=>{ devices[di].profiles[pi].screens[si]=photo; renderDevices(); updExtractBtn(); });
+}
+function screenMultiAdded(e,di,pi,si){
+  const files=Array.from(e.target.files);
+  if(!files.length)return;
+  // Fill from slot si onwards, creating new slots as needed
+  files.forEach((f,offset)=>{
+    const targetSi=si+offset;
+    // Ensure enough screen slots exist
+    const prof=devices[di].profiles[pi];
+    while(prof.screens.length<=targetSi) prof.screens.push(null);
+    readFile(f,photo=>{
+      devices[di].profiles[pi].screens[targetSi]=photo;
+      // Re-render after last file
+      if(offset===files.length-1){ renderDevices(); updExtractBtn(); }
+    });
+  });
+}
+
+function specialPhotoAdded(e,di,pi,idx){
+  const f=e.target.files[0];if(!f)return;
+  readFile(f,photo=>{
+    if(idx===-1) devices[di]._labelPhoto=photo;
+    if(idx===-2) devices[di]._barcodePhoto=photo;
+    if(idx===-3) devices[di].profiles[pi]._alarmPhoto=photo;
+    if(idx===-4) devices[di]._frontPhoto=photo;
+    renderDevices(); updExtractBtn();
+  });
+}
+function readFile(file,cb){
+  const img=new Image();
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    URL.revokeObjectURL(url);
+    const MAX=640; // max dimension in pixels — kept low for API size limits
+    let w=img.width, h=img.height;
+    if(w>MAX||h>MAX){
+      if(w>h){h=Math.round(h*MAX/w);w=MAX;}
+      else{w=Math.round(w*MAX/h);h=MAX;}
+    }
+    const canvas=document.createElement('canvas');
+    canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0,w,h);
+    const compressed=canvas.toDataURL('image/jpeg',0.50);
+    const data=compressed.split(',')[1];
+    cb({data,mime:'image/jpeg',name:file.name});
+  };
+  img.src=url;
+}
+
+function updExtractBtn(){
+  // enable if any photo exists anywhere
+  let hasAny=false;
+  devices.forEach(dev=>{
+    if(dev._labelPhoto||dev._barcodePhoto) hasAny=true;
+    dev.profiles.forEach(prof=>{
+      if(prof._alarmPhoto) hasAny=true;
+      prof.screens.forEach(s=>{ if(s) hasAny=true; });
+    });
+  });
+  document.getElementById('extractBtn').disabled=!hasAny||!mode;
+}
+
+// == EXTRACTION ==
+async function extractAll(){
+  document.getElementById('extractBtn').disabled=true;
+  document.getElementById('progressCard').style.display='block';
+  setP(5);setSt('Preparing photos…','');
+
+  // Build photo array with rich labels
+  const photos=[];
+
+  devices.forEach((dev,di)=>{
+    const devLabel=dev.type==='old'?'OLD ventilator':dev.type==='new'?'NEW ventilator':'Device';
+    if(dev._frontPhoto) photos.push({...dev._frontPhoto,label:`${devLabel} — front of device (use this to identify the device model and manufacturer)`});
+    if(dev._labelPhoto) photos.push({...dev._labelPhoto,label:`${devLabel} — serial number label plate (this is the ${devLabel} serial number, NOT the other device)`});
+    if(dev._barcodePhoto) photos.push({...dev._barcodePhoto,label:`${devLabel} — barcode or asset tag (this belongs to the ${devLabel})`});
+    dev.profiles.forEach((prof,pi)=>{
+      const profLabel=dev.profiles.length>1?` Profile ${prof.num}`:'';
+      prof.screens.forEach((sc,si)=>{
+        if(sc) photos.push({...sc,label:`${devLabel}${profLabel} — settings screen ${si+1} of ${prof.screens.filter(Boolean).length} (these settings belong to the ${devLabel})`});
+      });
+      if(prof._alarmPhoto) photos.push({...prof._alarmPhoto,label:`${devLabel}${profLabel} — alarms panel (these alarms belong to the ${devLabel})`});
+    });
+  });
+
+  if(!photos.length){ toast('No photos to analyse','err'); document.getElementById('extractBtn').disabled=false; document.getElementById('progressCard').style.display='none'; return; }
+
+  // Check total size before sending
+  const totalB64=photos.reduce((s,p)=>s+(p.data?.length||0),0);
+  const totalMB=(totalB64*0.75/1024/1024).toFixed(1);
+  if(totalB64>20000000){
+    toast(`${photos.length} photos = ~${totalMB}MB — too large. Remove some screens and try again.`,'err');
+    setSt(`✗ Too large (~${totalMB}MB). Remove some screens and retry.`,'err');
+    document.getElementById('extractBtn').disabled=false;
+    document.getElementById('progressCard').style.display='none';
+    return;
+  }
+  setP(25);setSt(`Sending ${photos.length} photo${photos.length>1?'s':''} to AI (~${totalMB}MB)...`,'');
+
+  const modeContext=mode==='change'?'CHANGE OF DEVICE — there are photos of the OLD device being replaced and the NEW device being installed.':'SAME DEVICE — service, settings change, or prescription update.';
+
+  try{
+    const resp=await fetch(cfg.worker,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-App-Passphrase':cfg.pass},
+      body:JSON.stringify({photos:photos.map(p=>({data:p.data,mimeType:p.mime,label:p.label})),mode,modeContext})
+    });
+    setP(75);setSt('Processing AI response…','');
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({error:'Server error '+resp.status}));
+      throw new Error(err.error||'Server error');
+    }
+    extracted=await resp.json();
+    setP(100);
+    setSt('✓ '+(extracted.summary||'Complete — review below'),'ok');
+    document.getElementById('confFill').style.width=(extracted.confidence||0)+'%';
+    document.getElementById('confPct').textContent=(extracted.confidence||0)+'%';
+    renderResults();
+    document.getElementById('resultsCard').style.display='block';
+    document.getElementById('notesCard').style.display='block';
+    document.getElementById('downloadBtn').style.display='inline-flex';
+    document.getElementById('extractBtn').style.display='none';
+    toast('AI extracted data — review before downloading','ok');
+    setTimeout(()=>document.getElementById('resultsCard').scrollIntoView({behavior:'smooth',block:'start'}),300);
+  }catch(e){
+    setP(0);setSt('✗ '+e.message,'err');
+    toast(e.message,'err');
+    document.getElementById('extractBtn').disabled=false;
+  }
+  setTimeout(()=>document.getElementById('progressCard').style.display='none',1500);
+}
+
+// == RENDER RESULTS ==
+function renderResults(){
+  const body=document.getElementById('resultsBody');
+  body.innerHTML='';
+  if(!extracted)return;
+  const x=extracted;
+
+  const mkSection=(title,rows,color='blue')=>{
+    if(!rows||!rows.length)return;
+    const sec=document.createElement('div');
+    sec.className='rs-section';
+    sec.innerHTML=`<div class="rs-hdr ${color}">${title}</div><div class="rs-rows">${
+      rows.map(r=>`<div class="rs-row"><div class="rs-lbl">${esc(r.label)}</div><div class="rs-val"><input type="text" value="${esc(r.value||'')}" data-label="${esc(r.label)}"></div></div>`).join('')
+    }</div>`;
+    body.appendChild(sec);
+  };
+
+  // Device details
+  if(mode==='change'){
+    mkSection('Old Ventilator — Device',[
+      {label:'Device name',value:x.oldDeviceName||x.deviceName||''},
+      {label:'Serial number',value:x.oldSerial||x.serialNumber||''},
+      {label:'Device / asset number',value:x.oldAsset||x.assetNumber||''},
+      {label:'Barcode',value:x.oldBarcode||x.barcode||''},
+      {label:'Last service date',value:x.serviceDate||''},
+    ],'amber');
+    mkSection('New Ventilator — Device',[
+      {label:'Device name',value:x.newDeviceName||''},
+      {label:'Serial number',value:x.newSerial||''},
+      {label:'Device / asset number',value:x.newAsset||''},
+      {label:'Barcode',value:x.newBarcode||''},
+    ],'green');
+  } else {
+    mkSection('Device Details',[
+      {label:'Device name',value:x.deviceName||''},
+      {label:'Serial number',value:x.serialNumber||''},
+      {label:'Device / asset number',value:x.assetNumber||''},
+      {label:'Barcode',value:x.barcode||''},
+      {label:'Service date',value:x.serviceDate||''},
+    ],'blue');
+  }
+
+  // Profiles/settings
+  const profiles=x.profiles||[];
+  profiles.forEach((prof,pi)=>{
+    const profLabel=profiles.length>1?`Profile ${pi+1}${prof.name?' — '+prof.name:''}`:null;
+    if(prof.settings&&prof.settings.length){
+      mkSection(profLabel?`Ventilator Settings — ${profLabel}`:'Ventilator Settings',prof.settings,'blue');
+    }
+    if(prof.alarms&&prof.alarms.length){
+      mkSection(profLabel?`Alarms — ${profLabel}`:'Alarms',prof.alarms,'grey');
+    }
+  });
+
+  // Fallback if no profiles structure
+  if(!profiles.length){
+    if(x.settings&&x.settings.length) mkSection('Ventilator Settings',x.settings,'blue');
+    if(x.alarms&&x.alarms.length) mkSection('Alarms',x.alarms,'grey');
+  }
+}
+
+// == DOWNLOAD ==
+function downloadRecord(){
+  if(!extracted){toast('No data yet','err');return;}
+  const inputs=document.querySelectorAll('#resultsBody input[type="text"]');
+  const edits={};
+  inputs.forEach(i=>{edits[i.dataset.label]=i.value;});
+  const date=new Date().toLocaleDateString('en-GB');
+  const ref='VSR-'+Date.now().toString().slice(-6).toUpperCase();
+  const notes=document.getElementById('notesField').value.trim();
+  const x=extracted;
+  const ev=label=>edits[label]!==undefined?edits[label]:'--';
+  const NL='\n';
+  const DIV='-'.repeat(50)+NL;
+  const row=(lbl,val)=>lbl.padEnd(28)+'  '+(val||'--')+NL;
+  const hdr=(title)=>NL+title.toUpperCase()+NL+DIV;
+  let t='';
+  t+='VENTILATOR SETTINGS RECORD'+NL;
+  t+='Sleep & Ventilation  Royal Brompton Hospital / GSTT'+NL;
+  t+=(mode==='change'?'CHANGE OF DEVICE':'SAME DEVICE')+'  Date: '+date+'  Ref: '+ref+NL;
+  t+=DIV;
+  if(mode==='change'){
+    t+=hdr('Old Ventilator');
+    t+=row('Device name',ev('Device name'));
+    t+=row('Serial number',ev('Serial number'));
+    t+=row('Asset / device no.',ev('Device / asset number'));
+    t+=row('Barcode',ev('Barcode'));
+    t+=row('Last service date',ev('Last service date'));
+    t+=hdr('New Ventilator');
+    t+=row('Device name',ev('Device name'));
+    t+=row('Serial number',ev('Serial number'));
+    t+=row('Asset / device no.',ev('Device / asset number'));
+    t+=row('Barcode',ev('Barcode'));
+  } else {
+    t+=hdr('Device Details');
+    t+=row('Device name',ev('Device name'));
+    t+=row('Serial number',ev('Serial number'));
+    t+=row('Asset / device no.',ev('Device / asset number'));
+    t+=row('Barcode',ev('Barcode'));
+    t+=row('Service date',ev('Service date'));
+  }
+  const profiles=x.profiles||[];
+  if(profiles.length){
+    profiles.forEach(function(prof,pi){
+      const pl=profiles.length>1?' -- Profile '+(pi+1)+(prof.name?' ('+prof.name+')':''):' ';
+      if(prof.settings&&prof.settings.length){
+        t+=hdr('Ventilator Settings'+pl);
+        prof.settings.forEach(function(s){t+=row(s.label,edits[s.label]!==undefined?edits[s.label]:s.value);});
+      }
+      if(prof.alarms&&prof.alarms.length){
+        t+=hdr('Alarms'+pl);
+        prof.alarms.forEach(function(a){t+=row(a.label,edits[a.label]!==undefined?edits[a.label]:a.value);});
+      }
+    });
+  } else {
+    if(x.settings&&x.settings.length){
+      t+=hdr('Ventilator Settings');
+      x.settings.forEach(function(s){t+=row(s.label,edits[s.label]!==undefined?edits[s.label]:s.value);});
+    }
+    if(x.alarms&&x.alarms.length){
+      t+=hdr('Alarms');
+      x.alarms.forEach(function(a){t+=row(a.label,edits[a.label]!==undefined?edits[a.label]:a.value);});
+    }
+  }
+  if(notes){t+=hdr('Additional Notes');t+=notes+NL;}
+  t+=hdr('Sent By');
+  t+=row('Name',cfg.name||'Steve Cutts');
+  t+=row('Position',cfg.role||'Respiratory Physiotherapist');
+  t+=row('Hospital',cfg.hosp||'Royal Brompton Hospital / GSTT');
+  t+=NL+DIV;
+  t+='Please add patient details below before sending:'+NL+NL;
+  t+='Name:           '+NL;
+  t+='NHS number:     '+NL;
+  t+='Date of birth:  '+NL;
+  t+='Address:        '+NL+NL;
+  t+='Send to: bhltd.niv@nhs.net  Tel: 0800 121 4524'+NL;
+  t+=DIV;
+  const blob=new Blob([t],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='VSR_'+ref+'_'+date.replace(/\//g,'-')+'.txt';
+  a.click();
+  const subj=encodeURIComponent('Ventilator Settings Record -- '+ref+' -- '+date);
+  const body=encodeURIComponent(t);
+  setTimeout(function(){window.location.href='mailto:bhltd.niv@nhs.net?subject='+subj+'&body='+body;},700);
+  toast('Downloaded & email client opened','ok');
+}
+
+// == RESET ==
+function resetForm(){
+  mode=null;devices=[];extracted=null;
+  document.getElementById('modeChange').classList.remove('on');
+  document.getElementById('modeSame').classList.remove('on');
+  document.getElementById('devicesWrap').style.display='none';
+  document.getElementById('resultsCard').style.display='none';
+  document.getElementById('notesCard').style.display='none';
+  document.getElementById('progressCard').style.display='none';
+  document.getElementById('downloadBtn').style.display='none';
+  document.getElementById('extractBtn').style.display='inline-flex';
+  document.getElementById('extractBtn').disabled=true;
+  document.getElementById('notesField').value='';
+  document.getElementById('mainContent').scrollTo(0,0);
+}
+
+// == HELPERS ==
+function setP(p){document.getElementById('pfill').style.width=p+'%';}
+function setSt(m,c){const e=document.getElementById('status');e.textContent=m;e.className='status'+(c?' '+c:'');}
+function gv(id){return document.getElementById(id)?.value||'';}
+function sv(id,v){const e=document.getElementById(id);if(e)e.value=v||'';}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function toast(msg,type=''){
+  const c=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast '+type;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),200);},3400);
+}
+
+loadCfg();
+</script>
+</body>
+</html>
